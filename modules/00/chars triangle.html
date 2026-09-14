@@ -23,13 +23,17 @@
 
 <script type=module>
 import { Console as CLI } from "endap"
-const consoles = CLI.create("40px");
+const consoles = CLI.create("100px");
 
 const cnt = document.getElementById("cnt1");
 cnt.append(consoles.el);
 
-consoles.ver();
-consoles.log("ini coba");
+for(let i = 1; i <= 5; i++) {
+  for(let j = 1; j <= i; j++) {
+    consoles.log("o", "");
+  }
+  consoles.log();
+ }
 </script>
 
 

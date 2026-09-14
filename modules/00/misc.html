@@ -23,13 +23,19 @@
 
 <script type=module>
 import { Console as CLI } from "endap"
-const consoles = CLI.create("40px");
+const consoles = CLI.create("100px");
 
 const cnt = document.getElementById("cnt1");
 cnt.append(consoles.el);
 
-consoles.ver();
-consoles.log("ini coba");
+consoles.log("x\tx^2\tx^3");
+for(let x = 0; x < 6; x++) {
+  let x2 = x * x;
+  let x3 = x * x2;
+  consoles.log(x, "\t");
+  consoles.log(x2, "\t");
+  consoles.log(x3);
+}
 </script>
 
 
