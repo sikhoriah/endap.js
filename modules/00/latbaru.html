@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang=en-us dir=ltr>
+<head>
+  <link rel='stylesheet' href="/assets/css/style.css">
+</head>
+<body>
+<!-- code begins -->
+
+
+<script src="/libs/chartjs/4.5.1/chart.umd.min.js" defer></script>
+<script type="importmap">
+{
+  "imports": {
+    "endap": "/libs/endap/0.0.3/endap.min.js"
+  }
+}
+</script>
+
+
+<div id="cnt0">
+</div>
+
+
+<script type=module>
+import { Console as CLI } from "endap"
+const consoles = CLI.create("300px");
+
+const cnt = document.getElementById("cnt0");
+cnt.append(consoles.el);
+
+function f(x) {
+  let c0 = 21.3;
+  let c1 = -10.3;
+  let c2 = 1;
+  let y = c0 + c1 * x + c2 * x * x;
+  return y;
+}
+
+let x2 = 0;
+let xmin = 0;
+let xmax = 10;
+let dx = 0.2;
+let n = (xmax - xmin) / dx;
+let s1 = Math.sign(f(xmin));
+let x1 = f(xmin);
+for(let i = 1; i <= n; i++) {
+   x2 = xmin + i*dx;
+  let y = f(x2);
+  let s2 = Math.sign(y);
+  if (s1*s2 < 0){
+  consoles.log(x1.toFixed(2), "\t");
+  consoles.log(f(x1).toFixed(2));
+  consoles.log(x2.toFixed(2), "\t");
+  consoles.log(y.toFixed(2));
+	break;
+  }else{
+	s1 = s2;
+	x1 = x2;
+  }
+} 
+
+ xmin = x1;
+ xmax = x2;
+ dx = 0.01;
+ n = (xmax - xmin) / dx;
+ s1 = Math.sign(f(xmin));
+ x1 = f(xmin);
+for(let i = 1; i <= n; i++) {
+   x2 = xmin + i*dx;
+  let y = f(x2);
+  let s2 = Math.sign(y);
+  if (s1*s2 < 0){
+  consoles.log(x1.toFixed(2), "\t");
+  consoles.log(f(x1).toFixed(2));
+  consoles.log(x2.toFixed(2), "\t");
+  consoles.log(y.toFixed(2));
+	break;
+  }else{
+	s1 = s2;
+	x1 = x2;
+  }
+ }
+</script>
+
+
+<!-- code ends -->
+</body>
+</html>

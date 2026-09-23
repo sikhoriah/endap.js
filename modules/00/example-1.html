@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang=en-us dir=ltr>
+<head>
+  <link rel='stylesheet' href="/assets/css/style.css">
+</head>
+<body>
+<!-- code begins -->
+
+
+<script src="/libs/chartjs/4.5.1/chart.umd.min.js" defer></script>
+<script type="importmap">
+{
+  "imports": {
+    "endap": "/libs/endap/0.0.3/endap.min.js"
+  }
+}
+</script>
+
+
+<div id="cnt0">
+<div id="cnt1">
+</div>
+
+
+<script type=module>
+import { Console as CLI } from "endap";
+import { RandNum as RNU } from "endap";
+
+const consoles = CLI.create("100px");
+
+const cnt = document.getElementById("cnt0");
+cnt.append(consoles.el);
+
+const min = 10;
+const max = 90
+const n = 10;
+const x = RNU.randIntN(min, max, n);
+
+console.log();
+const xA = [...x];
+const xD = [...x];
+for(let i = 0; i < n; i++) {
+  for(let j = i+1; j < n; j++) {
+    if(xA[i] > xA[j]) {
+      let tmp = xA[i];
+      xA[i] = xA[j];
+      xA[j] = tmp;
+    }
+  }
+}
+for(let i = 0; i < n; i++) {
+  for(let j = i+1; j < n; j++) {
+    if(xD[i] < xD[j]) {
+      let tmp = xD[i];
+      xD[i] = xD[j];
+      xD[j] = tmp;
+    }
+  }
+}
+consoles.log("x = ", "");
+consoles.log(x);
+consoles.log("xA = ", "");
+consoles.log(xA);
+consoles.log("xD = ", "");
+consoles.log(xD);
+</script>
+
+
+<!-- code ends -->
+</body>
+</html>
