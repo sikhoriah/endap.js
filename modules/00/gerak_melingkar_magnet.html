@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerak Melingkar dalam Medan Magnet</title>
+<style>
+  body { font-family: "Times New Roman", serif; margin: 0; padding: 12px; background: #fafafa; color: #222; }
+  h2 { margin: 4px 0 10px; font-size: 20px; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 16px; }
+  canvas { background: #fff; border: 1px solid #ccc; max-width: 100%; }
+  .panel { min-width: 260px; flex: 1; }
+  .row { margin-bottom: 10px; }
+  .row label { display: flex; justify-content: space-between; font-size: 15px; }
+  input[type=range] { width: 100%; }
+  .info { background: #fff; border: 1px solid #ccc; padding: 8px 10px; font-size: 15px; line-height: 1.6; }
+  button { font-family: inherit; font-size: 14px; padding: 4px 10px; margin: 2px 4px 2px 0; }
+  .warn { color: #c0392b; }
+</style>
+</head>
+<body>
+<h2>Gerak Partikel Bermuatan dalam Medan Magnet Seragam</h2>
+<div class="wrap">
+  <canvas id="cv" width="600" height="600"></canvas>
+  <div class="panel">
+    <div class="row"><label>Massa m <span id="mVal"></span></label>
+      <input type="range" id="m" min="0.5" max="5" step="0.1" value="1"></div>
+    <div class="row"><label>Muatan q <span id="qVal"></span></label>
+      <input type="range" id="q" min="-5" max="5" step="0.1" value="1"></div>
+    <div class="row"><label>Medan magnet B <span id="BVal"></span></label>
+      <input type="range" id="B" min="0.2" max="5" step="0.1" value="2"></div>
+    <div class="row"><label>Laju awal v₀ <span id="vVal"></span></label>
+      <input type="range" id="v0" min="0.5" max="10" step="0.1" value="5"></div>
+    <div class="row"><label>Arah kecepatan awal θ <span id="thVal"></span></label>
+      <input type="range" id="th" min="0" max="360" step="1" value="53"></div>
+    <div class="row"><label>Skala (piksel per satuan) <span id="sVal"></span></label>
+      <input type="range" id="s" min="5" max="150" step="1" value="60"></div>
+    <div class="row">
+      <button id="play">Jeda</button>
+      <button id="reset">Ulang</button>
+      <label style="display:inline"><input type="checkbox" id="ghost" checked> tampilkan lintasan sebelumnya</label>
+    </div>
+    <div class="info" id="info"></div>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const ids = ["m", "q", "B", "v0", "th", "s"];
+const el = {};
+ids.forEach(id => el[id] = document.getElementById(id));
+el.ghost = document.getElementById("ghost");
+
+let t = 0, running = true, trail = [], ghost = null, last = null;
+
+function params() {
+  const m = +el.m.value, q = +el.q.value, B = +el.B.value;
+  const v0 = +el.v0.value, th = +el.th.value * Math.PI / 180;
+  const v0x = v0 * Math.cos(th), v0y = v0 * Math.sin(th);
+  const w = q * B / m;                        // frekuensi sudut ω = qB/m
+  const R = (q === 0) ? Infinity : m * v0 / (Math.abs(q) * B);
+  const T = (q === 0) ? Infinity : 2 * Math.PI * m / (Math.abs(q) * B);
+  return { m, q, B, v0, v0x, v0y, w, R, T };
+}
+
+// Posisi dari fungsi parametrik. Titik asal dipilih di pusat lingkaran:
+// x - xc = (v0x/ω) sin ωt − (v0y/ω) cos ωt,  y - yc = (v0x/ω) cos ωt + (v0y/ω) sin ωt
+function pos(p, t) {
+  if (p.q === 0) return { x: p.v0x * t, y: p.v0y * t };   // tanpa muatan: gerak lurus
+  const s = Math.sin(p.w * t), c = Math.cos(p.w * t);
+  return { x: (p.v0x / p.w) * s - (p.v0y / p.w) * c,
+           y: (p.v0x / p.w) * c + (p.v0y / p.w) * s };
+}
+function vel(p, t) {
+  if (p.q === 0) return { x: p.v0x, y: p.v0y };
+  const s = Math.sin(p.w * t), c = Math.cos(p.w * t);
+  return { x: p.v0x * c + p.v0y * s, y: -p.v0x * s + p.v0y * c };
+}
+
+const scale = () => +el.s.value;
+const toPx = (x, y) => [cv.width / 2 + x * scale(), cv.height / 2 - y * scale()];
+
+function arrow(x0, y0, x1, y1, color) {
+  const a = Math.atan2(y1 - y0, x1 - x0);
+  ctx.strokeStyle = ctx.fillStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - 10 * Math.cos(a - 0.4), y1 - 10 * Math.sin(a - 0.4));
+  ctx.lineTo(x1 - 10 * Math.cos(a + 0.4), y1 - 10 * Math.sin(a + 0.4));
+  ctx.closePath(); ctx.fill();
+}
+
+function drawBackground(p) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // simbol medan magnet: ⊙ keluar bidang (B ke +z)
+  ctx.fillStyle = "#ccc"; ctx.font = "14px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (let x = 30; x < cv.width; x += 60)
+    for (let y = 30; y < cv.height; y += 60) ctx.fillText("⊙", x, y);
+  // sumbu
+  ctx.strokeStyle = "#ddd"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, cv.height / 2); ctx.lineTo(cv.width, cv.height / 2);
+  ctx.moveTo(cv.width / 2, 0); ctx.lineTo(cv.width / 2, cv.height); ctx.stroke();
+  ctx.fillStyle = "#555"; ctx.textAlign = "left";
+  ctx.fillText("B keluar bidang (+z)", 10, cv.height - 12);
+}
+
+function drawCircle(p, color, dash) {
+  if (!isFinite(p.R)) return;
+  ctx.setLineDash(dash); ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cv.width / 2, cv.height / 2, p.R * scale(), 0, 2 * Math.PI); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function frame() {
+  const p = params();
+  drawBackground(p);
+
+  if (el.ghost.checked && ghost) drawCircle(ghost, "#bbb", [6, 6]);
+  drawCircle(p, "#9ec5e8", []);
+
+  // jejak partikel
+  ctx.strokeStyle = "#1f77b4"; ctx.lineWidth = 3; ctx.beginPath();
+  trail.forEach((pt, i) => { const [X, Y] = toPx(pt.x, pt.y); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
+  ctx.stroke();
+
+  const r = pos(p, t), v = vel(p, t);
+  const [X, Y] = toPx(r.x, r.y);
+
+  // jari-jari ke partikel
+  if (isFinite(p.R)) {
+    ctx.strokeStyle = "#999"; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cv.width / 2, cv.height / 2); ctx.lineTo(X, Y); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // vektor kecepatan (merah) dan gaya magnetik F = q v × B (hijau, menuju pusat)
+  const k = 12;
+  arrow(X, Y, X + v.x * k, Y - v.y * k, "#d62728");
+  if (p.q !== 0) {
+    const Fx = p.q * v.y * p.B, Fy = -p.q * v.x * p.B;   // q (v × B) dengan B = B ẑ
+    const Fmag = Math.hypot(Fx, Fy), L = 45;
+    arrow(X, Y, X + Fx / Fmag * L, Y - Fy / Fmag * L, "#2ca02c");
+  }
+
+  ctx.fillStyle = p.q > 0 ? "#d62728" : (p.q < 0 ? "#1f3fb4" : "#555");
+  ctx.beginPath(); ctx.arc(X, Y, 7, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = "bold 11px sans-serif";
+  ctx.fillText(p.q > 0 ? "+" : (p.q < 0 ? "−" : ""), X, Y + 1);
+
+  updateInfo(p);
+
+  if (running) {
+    trail.push(r);
+    if (trail.length > 400) trail.shift();
+    const dt = isFinite(p.T) ? p.T / 300 : 0.02;   // tiap putaran ±5 detik
+    t += dt;
+  }
+  requestAnimationFrame(frame);
+}
+
+function fmt(x) { return isFinite(x) ? x.toFixed(3) : "∞"; }
+
+function updateInfo(p) {
+  document.getElementById("mVal").textContent = p.m.toFixed(1);
+  document.getElementById("qVal").textContent = p.q.toFixed(1);
+  document.getElementById("BVal").textContent = p.B.toFixed(1);
+  document.getElementById("vVal").textContent = p.v0.toFixed(1);
+  document.getElementById("thVal").textContent = (+el.th.value) + "°";
+  document.getElementById("sVal").textContent = scale();
+
+  let arah = "—";
+  if (p.q > 0) arah = "searah jarum jam";
+  if (p.q < 0) arah = "berlawanan arah jarum jam";
+  const keluar = isFinite(p.R) && p.R * scale() > cv.width / 2
+    ? '<br><span class="warn">Lintasan keluar kanvas, kecilkan skala.</span>' : "";
+  const nol = p.q === 0 ? '<br><span class="warn">q = 0: tidak ada gaya magnetik, partikel bergerak lurus.</span>' : "";
+
+  document.getElementById("info").innerHTML =
+    `ω = qB/m = <b>${fmt(p.w)}</b><br>` +
+    `R = mv₀/(|q|B) = <b>${fmt(p.R)}</b><br>` +
+    `T = 2πm/(|q|B) = <b>${fmt(p.T)}</b><br>` +
+    `Arah putaran: <b>${arah}</b><br>` +
+    `<span style="color:#d62728">■</span> kecepatan &nbsp; <span style="color:#2ca02c">■</span> gaya magnetik` +
+    (ghost && el.ghost.checked ? `<br><span style="color:#999">- - -</span> lintasan sebelumnya (R = ${fmt(ghost.R)})` : "") +
+    keluar + nol;
+}
+
+function reset() { t = 0; trail = []; }
+
+// Saat parameter fisis diubah: simpan lintasan lama sebagai pembanding, lalu ulang
+["m", "q", "B", "v0", "th"].forEach(id => {
+  el[id].addEventListener("pointerdown", () => { last = params(); });
+  el[id].addEventListener("input", () => { if (last) ghost = last; reset(); });
+});
+document.getElementById("reset").onclick = reset;
+document.getElementById("play").onclick = e => {
+  running = !running; e.target.textContent = running ? "Jeda" : "Jalan";
+};
+
+frame();
+</script>
+</body>
+</html>
